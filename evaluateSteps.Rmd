@@ -1,0 +1,126 @@
+---
+title: "R MarkDown"
+author: "James Deckert"
+date: "Tuesday, October 13, 2015"
+output: html_document
+---
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r}
+    df <- read.csv("repdata-data-activity/activity.csv", header=TRUE)  
+
+```
+#What is mean total number of steps taken per day?
+```{r}
+#Calculate the total number of steps taken per day
+sumstepeachday <- aggregate(steps ~ date, data=df, sum) #, na.rm=TRUE NA's are automatically excluded
+
+#If you do not understand the difference between a histogram and a barplot, research the difference between them. Make a histogram of the total number of steps taken each day
+converted <- as.Date(sumstepeachday$date, format="%Y-%m-%d")
+#datevect=strptime(sumstepeachday$date, format="%Y-%m-%d")
+plot(converted, sumstepeachday$steps, type="s", xlab="Date", ylab="Num Steps per day", main="Total Number of Steps Per Day")
+
+#Calculate and report the mean and median of the total number of steps taken per day
+meanstepeachday <- aggregate(steps ~ date, data=df, mean, na.rm=TRUE)
+meanstepeachday
+medianstepeachday <- aggregate(steps ~ date, data=df, median, na.rm=TRUE)
+medianstepeachday
+
+
+```
+
+#What is the average daily activity pattern?
+```{r}
+#Make a time series plot (i.e. type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all days (y-axis)
+avgstepsperinterval <- aggregate(steps ~ interval, data=df, mean, na.rm=TRUE)
+plot(avgstepsperinterval$interval, avgstepsperinterval$steps, type="l", xlab="Interval", ylab="Num Steps per day", main="Avg Number of Steps per 5 minute Interval")
+#Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?
+avgstepsperinterval$interval[avgstepsperinterval$steps==max(avgstepsperinterval$steps)]
+
+```
+#Imputing missing values
+##Devise a strategy for filling in all of the missing values in the dataset. 
+##The strategy does not need to be sophisticated. 
+##For example, you could use the mean/median for that day, or the mean for that 5-minute interval, etc.
+
+#As there are definately trends throughout the day, it seems like the most reasonable would be to use the mean of the interval
+```{r}
+library(ggplot2)
+#Calculate and report the total number of missing values in the dataset (i.e. the total number of rows with NAs)
+sum(is.na(df$steps))
+
+#Create a new dataset that is equal to the original dataset but with the missing data filled in.
+#copy original data, work with the copy
+dfAdj<-df
+#logical vector marking NA's
+nasteps<-is.na(dfAdj$steps)
+#replace NA's with mean
+dfAdj$steps[nasteps]<-avgstepsperinterval$steps
+#verifying are there any NA's? should be 0
+sum(is.na(dfAdj$steps))
+
+#Make a histogram of the total number of steps taken each day 
+sumstepeachdayADJ <- aggregate(steps ~ date, data=dfAdj, sum, na.rm=TRUE)
+sumstepeachdayADJ<-cbind(sumstepeachdayADJ, type=c("Adjusted"))
+#sumstepeachdayADJ$date <- as.Date(sumstepeachdayADJ$date, format="%Y-%m-%d")
+
+#get a data frame which aggregates, but leaves NA's so can be merged with adjusted (NA's replace by mean) data frame (all dates)
+sumstepeachdaywithNA <- aggregate(steps ~ date, data=df, sum,   na.action=NULL) # keep NA's in data frame
+sumstepeachdaywithNA<-cbind(sumstepeachdaywithNA, type=c("WithNA"))
+sumstepTOT<-rbind(sumstepeachdayADJ, sumstepeachdaywithNA)
+sumstepTOT$date <- as.Date(sumstepTOT$date, format="%Y-%m-%d")
+g<-ggplot(sumstepTOT, aes(date, steps,  group=type, shape=type, colour=type))+geom_line()+labs(title="Total Number of Steps per Day")
+p<-g+geom_point()
+print(p)
+#numbers are identical except for the days which contain NA's. Chart shows overlapping lines.
+
+#and Calculate and report the mean and median total number of steps taken per day. 
+#Do these values differ from the estimates from the first part of the assignment? 
+meanstepeachdayADJ <- aggregate(steps ~ date, data=dfAdj, mean, na.rm=TRUE)
+meanstepeachdayADJ<-cbind(meanstepeachdayADJ, type=c("Adjusted"))
+meanstepeachdaywithNA <- aggregate(steps ~ date, data=df, mean,   na.action=NULL) # keep NA's in data frame
+meanstepeachdaywithNA<-cbind(meanstepeachdaywithNA, type=c("WithNA"))
+meanstepTOT<-rbind(meanstepeachdayADJ, meanstepeachdaywithNA)
+meanstepTOT$date <- as.Date(meanstepTOT$date, format="%Y-%m-%d")
+g<-ggplot(meanstepTOT, aes(date, steps,  group=type, shape=type, colour=type))+geom_line()+labs(title="Avg Number of Steps per Day")
+p<-g+geom_point()
+print(p)
+#mean is identical except for the days which contain NA's. Chart shows overlapping lines.
+
+medstepeachdayADJ <- aggregate(steps ~ date, data=dfAdj, median, na.rm=TRUE)
+medstepeachdayADJ<-cbind(medstepeachdayADJ, type=c("Adjusted"))
+medstepeachdaywithNA <- aggregate(steps ~ date, data=df, median,   na.action=NULL) # keep NA's in data frame
+medstepeachdaywithNA<-cbind(medstepeachdaywithNA, type=c("WithNA"))
+medstepTOT<-rbind(medstepeachdayADJ, medstepeachdaywithNA)
+medstepTOT$date <- as.Date(medstepTOT$date, format="%Y-%m-%d")
+g<-ggplot(medstepTOT, aes(date, steps,  group=type, shape=type, colour=type))+geom_line()+labs(title="Median Number of Steps per Day")
+p<-g+geom_point()
+print(p)
+#What is the impact of imputing missing data on the estimates of the total daily number of steps?
+##median is way higher - because the median is 0 for each day, inserting the mean across each 5-min interval
+##significantly raises the median as each day is composed mostly of zeros except the missing days with NAs
+
+```
+#Are there differences in activity patterns between weekdays and weekends?
+```{r}
+
+weekend<-weekdays(as.Date(dfAdj$date)) %in% c("Saturday","Sunday") 
+dfAdj$DOW[weekend]<-"weekend"
+dfAdj$DOW[!weekend]<-"weekday"
+#dfPlotweekend=dfAdj[weekend,]
+#dfPlotweekday=dfAdj[!weekend,]
+dfAdjAgg <- aggregate(steps ~ interval+DOW, data=dfAdj, mean)
+#dfAdjweekendAgg <- aggregate(steps ~ interval+DOW, data=dfPlotweekend, mean)
+#dfAdjweekdayAgg <- aggregate(steps ~ interval+DOW, data=dfPlotweekday, mean)
+
+library(lattice)
+xyplot(dfAdjAgg$steps~dfAdjAgg$interval|dfAdjAgg$DOW, layout=c(1,2) , ylab="Number of Steps", xlab="interval",type="l")
+#par(mfrow=c(2,1))
+#plot(dfAdjweekendAgg$interval, dfAdjweekendAgg$steps, ylab="Number of Steps", xlab="interval",type="l")
+#plot(dfAdjweekdayAgg$interval, dfAdjweekdayAgg$steps, ylab="Number of Steps", xlab="interval", type="l")
+#dev.off
+
+```
